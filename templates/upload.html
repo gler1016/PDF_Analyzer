@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Contact Extractor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 2rem;
+        }
+        .upload-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 5px;
+            padding: 2rem;
+            text-align: center;
+            margin: 1rem 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #0d6efd;
+            background-color: #e9ecef;
+        }
+        .file-list {
+            margin-top: 1rem;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            margin-bottom: 0.5rem;
+        }
+        .file-item .remove-file {
+            margin-left: auto;
+            color: #dc3545;
+            cursor: pointer;
+        }
+        .alert {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="upload-container">
+            <h1 class="text-center mb-4">PDF Contact Extractor</h1>
+            
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="post" enctype="multipart/form-data" id="upload-form">
+                <div class="upload-area" id="drop-area">
+                    <input type="file" name="file" id="file-input" multiple accept=".pdf" style="display: none;">
+                    <div class="mb-3">
+                        <i class="bi bi-cloud-upload fs-1"></i>
+                        <h4>Drag & Drop PDF files here</h4>
+                        <p class="text-muted">or</p>
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+                            Choose Files
+                        </button>
+                    </div>
+                </div>
+
+                <div class="file-list" id="file-list"></div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="submit" class="btn btn-success" id="process-btn" disabled>
+                        Process Files
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="clearFiles()">
+                        Clear All Files
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+        const fileList = document.getElementById('file-list');
+        const processBtn = document.getElementById('process-btn');
+        let files = new Set();
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // Highlight drop area when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        // Handle dropped files
+        dropArea.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFiles, false);
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight(e) {
+            dropArea.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropArea.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const newFiles = dt.files;
+            handleFiles({ target: { files: newFiles } });
+        }
+
+        function handleFiles(e) {
+            const newFiles = [...e.target.files];
+            newFiles.forEach(file => {
+                if (file.type === 'application/pdf') {
+                    files.add(file);
+                    updateFileList();
+                } else {
+                    alert(`Invalid file type: ${file.name}. Only PDF files are allowed.`);
+                }
+            });
+            updateProcessButton();
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <span>${file.name}</span>
+                    <span class="remove-file" onclick="removeFile('${file.name}')">×</span>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        function removeFile(fileName) {
+            files = new Set([...files].filter(file => file.name !== fileName));
+            updateFileList();
+            updateProcessButton();
+        }
+
+        function updateProcessButton() {
+            processBtn.disabled = files.size === 0;
+        }
+
+        function clearFiles() {
+            if (confirm('Are you sure you want to clear all files?')) {
+                files.clear();
+                fileList.innerHTML = '';
+                updateProcessButton();
+                fetch('/clear', { method: 'POST' })
+                    .then(response => response.text())
+                    .then(() => window.location.reload());
+            }
+        }
+    </script>
+</body>
+</html> 

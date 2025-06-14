@@ -1,0 +1,38 @@
+2025-06-15 04:42:53,005 - INFO - Created directory: input_pdfs
+2025-06-15 04:42:53,006 - INFO - Created directory: output
+2025-06-15 04:42:53,007 - INFO - Created directory: logs
+2025-06-15 04:43:23,393 - INFO - Created directory: input_pdfs
+2025-06-15 04:43:23,393 - INFO - Created directory: output
+2025-06-15 04:43:23,393 - INFO - Created directory: logs
+2025-06-15 04:43:55,780 - INFO - Created directory: input_pdfs
+2025-06-15 04:43:55,780 - INFO - Created directory: output
+2025-06-15 04:43:55,781 - INFO - Created directory: logs
+2025-06-15 04:43:55,783 - INFO - ====== WebDriver manager ======
+2025-06-15 04:43:57,436 - INFO - Get LATEST chromedriver version for google-chrome
+2025-06-15 04:43:58,716 - INFO - Get LATEST chromedriver version for google-chrome
+2025-06-15 04:43:59,994 - INFO - Get LATEST chromedriver version for google-chrome
+2025-06-15 04:44:02,962 - INFO - WebDriver version 137.0.7151.70 selected
+2025-06-15 04:44:02,971 - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.70/win32/chromedriver-win32.zip
+2025-06-15 04:44:02,972 - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.70/win32/chromedriver-win32.zip
+2025-06-15 04:44:04,823 - INFO - Driver downloading response is 200
+2025-06-15 04:44:12,968 - INFO - Get LATEST chromedriver version for google-chrome
+2025-06-15 04:44:14,212 - INFO - Driver has been saved in cache [C:\Users\Administrator\.wdm\drivers\chromedriver\win64\137.0.7151.70]
+2025-06-15 04:45:44,606 - INFO - Created directory: input_pdfs
+2025-06-15 04:45:44,606 - INFO - Created directory: output
+2025-06-15 04:45:44,607 - INFO - Created directory: logs
+2025-06-15 04:45:44,609 - INFO - Found 1 PDF files to process
+2025-06-15 04:45:45,220 - INFO - Successfully exported 1 contacts to output\contacts.xlsx
+2025-06-15 04:45:45,220 - INFO - Successfully processed 1 contacts
+2025-06-15 04:45:45,220 - INFO - Results saved to output\contacts.xlsx
+2025-06-15 04:52:13,617 - INFO - Created directory: input_pdfs
+2025-06-15 04:52:13,617 - INFO - Created directory: output
+2025-06-15 04:52:13,617 - INFO - Created directory: logs
+2025-06-15 04:52:13,825 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-06-15 04:52:13,825 - INFO - [33mPress CTRL+C to quit[0m
+2025-06-15 04:52:13,827 - INFO -  * Restarting with stat
+2025-06-15 04:52:14,873 - INFO - Created directory: input_pdfs
+2025-06-15 04:52:14,873 - INFO - Created directory: output
+2025-06-15 04:52:14,873 - INFO - Created directory: logs
+2025-06-15 04:52:14,884 - WARNING -  * Debugger is active!
+2025-06-15 04:52:14,887 - INFO -  * Debugger PIN: 378-536-016
