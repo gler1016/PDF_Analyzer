@@ -2,30 +2,16 @@ import logging
 import requests
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import re
 import time
+from urllib.parse import urljoin, urlparse
 
 class DataEnricher:
     def __init__(self):
         self.session = requests.Session()
-        self.driver = None
-        self._setup_selenium()
-
-    def _setup_selenium(self):
-        """Setup Selenium WebDriver for dynamic content scraping."""
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
 
     def enrich(self, contacts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -72,17 +58,18 @@ class DataEnricher:
     def _find_company_website(self, company_name: str) -> str:
         """Find company website using search engine."""
         try:
+            # Search for company website
             search_url = f"https://www.google.com/search?q={company_name}+official+website"
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            response = self.session.get(search_url, timeout=10)
+            soup = BeautifulSoup(response.text, 'lxml')
             
-            response = self.session.get(search_url, headers=headers)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Look for the first search result
-            for result in soup.find_all('a'):
-                href = result.get('href', '')
-                if href.startswith('http') and not any(x in href for x in ['google.com', 'youtube.com', 'facebook.com']):
-                    return href
+            # Look for company website in search results
+            for link in soup.find_all('a'):
+                href = link.get('href', '')
+                if href.startswith('/url?q='):
+                    url = href.split('/url?q=')[1].split('&')[0]
+                    if self._is_valid_company_website(url, company_name):
+                        return url
             
         except Exception as e:
             logging.error(f"Error finding website for {company_name}: {str(e)}")
@@ -90,19 +77,21 @@ class DataEnricher:
         return ""
 
     def _find_linkedin_profile(self, name: str, company: str) -> str:
-        """Find LinkedIn profile using search."""
+        """Find LinkedIn profile URL."""
         try:
-            search_url = f"https://www.google.com/search?q={name}+{company}+site:linkedin.com/in"
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-            
-            response = self.session.get(search_url, headers=headers)
-            soup = BeautifulSoup(response.text, 'html.parser')
+            # Search for LinkedIn profile
+            search_query = f"{name} {company} site:linkedin.com/in/"
+            search_url = f"https://www.google.com/search?q={search_query}"
+            response = self.session.get(search_url, timeout=10)
+            soup = BeautifulSoup(response.text, 'lxml')
             
             # Look for LinkedIn profile in search results
-            for result in soup.find_all('a'):
-                href = result.get('href', '')
-                if 'linkedin.com/in/' in href:
-                    return href
+            for link in soup.find_all('a'):
+                href = link.get('href', '')
+                if href.startswith('/url?q='):
+                    url = href.split('/url?q=')[1].split('&')[0]
+                    if 'linkedin.com/in/' in url:
+                        return url
             
         except Exception as e:
             logging.error(f"Error finding LinkedIn profile for {name}: {str(e)}")
@@ -125,14 +114,12 @@ class DataEnricher:
             
             for url in contact_urls:
                 try:
-                    self.driver.get(url)
-                    time.sleep(2)  # Wait for dynamic content
+                    response = self.session.get(url, timeout=10)
+                    soup = BeautifulSoup(response.text, 'lxml')
                     
                     # Look for email patterns
-                    page_source = self.driver.page_source
                     email_pattern = r'[\w\.-]+@[\w\.-]+\.\w+'
-                    import re
-                    emails = re.findall(email_pattern, page_source)
+                    emails = re.findall(email_pattern, str(soup))
                     
                     if emails:
                         # Try to find email matching the contact name
@@ -150,7 +137,16 @@ class DataEnricher:
         
         return ""
 
-    def __del__(self):
-        """Cleanup Selenium WebDriver."""
-        if self.driver:
-            self.driver.quit() 
+    def _is_valid_company_website(self, url: str, company_name: str) -> bool:
+        """Check if URL is a valid company website."""
+        try:
+            # Parse URL
+            parsed = urlparse(url)
+            domain = parsed.netloc.lower()
+            
+            # Check if domain contains company name
+            company_words = company_name.lower().split()
+            return any(word in domain for word in company_words)
+            
+        except Exception:
+            return False 
