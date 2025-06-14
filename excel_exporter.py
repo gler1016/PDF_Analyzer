@@ -1,9 +1,10 @@
 import pandas as pd
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import logging
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from io import BytesIO
 
 class ExcelExporter:
     def __init__(self):
@@ -16,13 +17,13 @@ class ExcelExporter:
             bottom=Side(style='thin')
         )
 
-    def export(self, contacts: List[Dict[str, Any]], output_path: Path):
+    def export(self, contacts: List[Dict[str, Any]], output_path: Union[Path, BytesIO]):
         """
         Export contacts to an Excel file with proper formatting.
         
         Args:
             contacts: List of contact dictionaries to export
-            output_path: Path where the Excel file should be saved
+            output_path: Path or BytesIO object where the Excel file should be saved
         """
         try:
             # Convert to DataFrame
@@ -60,13 +61,13 @@ class ExcelExporter:
             # Apply formatting
             self._format_excel(output_path)
             
-            logging.info(f"Successfully exported {len(contacts)} contacts to {output_path}")
+            logging.info(f"Successfully exported {len(contacts)} contacts")
             
         except Exception as e:
             logging.error(f"Error exporting to Excel: {str(e)}")
             raise
 
-    def _format_excel(self, file_path: Path):
+    def _format_excel(self, file_path: Union[Path, BytesIO]):
         """Apply formatting to the Excel file."""
         from openpyxl import load_workbook
         

@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, render_template, send_file, flash, redirect, url_for
+from flask import Flask, request, render_template, send_file, flash, redirect, url_for, session
 from werkzeug.utils import secure_filename
 from pathlib import Path
 import logging
@@ -8,21 +8,18 @@ from pdf_extractor import PDFExtractor
 from excel_exporter import ExcelExporter
 from utils import setup_logging, create_directories, is_valid_pdf
 import tempfile
+import io
+import uuid
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Required for flashing messages
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
 # Configure upload settings
-UPLOAD_FOLDER = Path(tempfile.gettempdir()) / "input_pdfs"
-OUTPUT_FOLDER = Path(tempfile.gettempdir()) / "output"
 ALLOWED_EXTENSIONS = {'pdf'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Create necessary directories
-for directory in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
-    Path(directory).mkdir(exist_ok=True)
-    logging.info(f"Created directory: {directory}")
+# In-memory storage for files
+file_storage = {}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -30,7 +27,6 @@ def allowed_file(filename):
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        # Check if the post request has the file part
         if 'file' not in request.files:
             flash('No file part')
             return redirect(request.url)
@@ -45,13 +41,18 @@ def upload_file():
         for file in files:
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                file_path = app.config['UPLOAD_FOLDER'] / filename
-                file.save(file_path)
+                file_id = str(uuid.uuid4())
+                file_content = file.read()
+                file_storage[file_id] = {
+                    'filename': filename,
+                    'content': file_content
+                }
                 uploaded_files.append(filename)
             else:
                 flash(f'Invalid file type: {file.filename}. Only PDF files are allowed.')
         
         if uploaded_files:
+            session['uploaded_files'] = list(file_storage.keys())
             flash(f'Successfully uploaded: {", ".join(uploaded_files)}')
             return redirect(url_for('process_files'))
     
@@ -60,44 +61,63 @@ def upload_file():
 @app.route('/process')
 def process_files():
     try:
+        if 'uploaded_files' not in session:
+            flash('No files to process')
+            return redirect(url_for('upload_file'))
+
         # Initialize components
         pdf_extractor = PDFExtractor()
         excel_exporter = ExcelExporter()
         
-        # Get list of PDF files
-        pdf_files = list(app.config['UPLOAD_FOLDER'].glob("*.pdf"))
-        
-        if not pdf_files:
-            flash('No PDF files found in input_pdfs directory')
-            return redirect(url_for('upload_file'))
-        
         # Process each PDF
         all_contacts = []
-        for pdf_file in pdf_files:
-            try:
-                # Extract data from PDF
-                extracted_data = pdf_extractor.extract(pdf_file)
+        for file_id in session['uploaded_files']:
+            if file_id not in file_storage:
+                continue
                 
-                # Add source information
-                for contact in extracted_data:
-                    contact['source_pdf'] = pdf_file.name
-                    contact['last_updated'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                all_contacts.extend(extracted_data)
+            file_data = file_storage[file_id]
+            try:
+                # Create a temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                    temp_file.write(file_data['content'])
+                    temp_file.flush()
+                    
+                    # Extract data from PDF
+                    extracted_data = pdf_extractor.extract(Path(temp_file.name))
+                    
+                    # Add source information
+                    for contact in extracted_data:
+                        contact['source_pdf'] = file_data['filename']
+                        contact['last_updated'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    all_contacts.extend(extracted_data)
+                    
+                # Clean up temporary file
+                os.unlink(temp_file.name)
                 
             except Exception as e:
-                flash(f'Error processing {pdf_file.name}: {str(e)}')
+                flash(f'Error processing {file_data["filename"]}: {str(e)}')
                 continue
         
         if not all_contacts:
             flash('No contacts were extracted from the PDFs')
             return redirect(url_for('upload_file'))
         
-        # Export to Excel
-        output_file = OUTPUT_FOLDER / "contacts.xlsx"
-        excel_exporter.export(all_contacts, output_file)
+        # Create Excel file in memory
+        output = io.BytesIO()
+        excel_exporter.export(all_contacts, output)
+        output.seek(0)
+        
+        # Clear processed files
+        session.pop('uploaded_files', None)
+        file_storage.clear()
         
         flash(f'Successfully processed {len(all_contacts)} contacts')
-        return send_file(output_file, as_attachment=True)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='contacts.xlsx'
+        )
         
     except Exception as e:
         flash(f'Error: {str(e)}')
@@ -106,9 +126,8 @@ def process_files():
 @app.route('/clear', methods=['POST'])
 def clear_files():
     try:
-        # Clear input_pdfs directory
-        for file in app.config['UPLOAD_FOLDER'].glob("*.pdf"):
-            file.unlink()
+        session.pop('uploaded_files', None)
+        file_storage.clear()
         flash('All uploaded files have been cleared')
     except Exception as e:
         flash(f'Error clearing files: {str(e)}')
